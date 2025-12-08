@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+// electron/main.ts
 const electron_1 = require("electron");
 const node_path_1 = __importDefault(require("node:path"));
 let agentWindow = null;
@@ -10,7 +11,6 @@ const isDev = !!process.env.VITE_DEV_SERVER_URL;
 function createAgentWindow() {
     const display = electron_1.screen.getPrimaryDisplay();
     const { width: screenWidth, height: screenHeight } = display.workAreaSize;
-    // NORMAL モードのデフォルトサイズ
     const winWidth = 260;
     const winHeight = 210;
     const margin = 16;
@@ -22,10 +22,11 @@ function createAgentWindow() {
         width: winWidth,
         height: winHeight,
         resizable: false,
-        frame: true, // ← タイトルバーありに戻す
-        transparent: false, // ← 透明も一旦オフ
-        backgroundColor: "#020617", // ← 濃い色で中身が分かりやすく
-        alwaysOnTop: true, // ← 右下で常に最前面
+        frame: false, // ✅ タイトルバーを消す
+        transparent: true, // ✅ ウィンドウの背景を透明にする
+        backgroundColor: "#00000000", // 念のため完全透明
+        alwaysOnTop: true,
+        hasShadow: false, // OSの影はいらない（CSSでつける）
         webPreferences: {
             preload: node_path_1.default.join(__dirname, "preload.js"),
             contextIsolation: true,
@@ -34,8 +35,6 @@ function createAgentWindow() {
     });
     if (isDev && process.env.VITE_DEV_SERVER_URL) {
         agentWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
-        // 必要なら DevTools
-        // agentWindow.webContents.openDevTools({ mode: "detach" });
     }
     else {
         agentWindow.loadFile(node_path_1.default.join(__dirname, "../renderer/index.html"));
@@ -46,6 +45,27 @@ function createAgentWindow() {
 }
 electron_1.app.whenReady().then(() => {
     createAgentWindow();
+    // ★ NORMAL / COMPACT に応じてサイズ変更
+    electron_1.ipcMain.on("set-display-mode", (_event, mode) => {
+        if (!agentWindow)
+            return;
+        const display = electron_1.screen.getPrimaryDisplay();
+        const { width: screenWidth, height: screenHeight } = display.workAreaSize;
+        const margin = 16;
+        let winWidth;
+        let winHeight;
+        if (mode === "normal") {
+            winWidth = 260;
+            winHeight = 210;
+        }
+        else {
+            winWidth = 96;
+            winHeight = 96;
+        }
+        const x = Math.round(screenWidth - winWidth - margin);
+        const y = Math.round(screenHeight - winHeight - margin);
+        agentWindow.setBounds({ x, y, width: winWidth, height: winHeight });
+    });
     electron_1.app.on("activate", () => {
         if (electron_1.BrowserWindow.getAllWindows().length === 0) {
             createAgentWindow();
@@ -53,7 +73,6 @@ electron_1.app.whenReady().then(() => {
     });
 });
 electron_1.app.on("window-all-closed", () => {
-    // macOS でも右下エージェント以外のウィンドウを閉じたら終了でOK
     if (process.platform !== "darwin") {
         electron_1.app.quit();
     }

@@ -1,5 +1,8 @@
-import { app, BrowserWindow, screen } from "electron";
+// electron/main.ts
+import { app, BrowserWindow, screen, ipcMain } from "electron";
 import path from "node:path";
+
+type DisplayMode = "normal" | "compact";
 
 let agentWindow: BrowserWindow | null = null;
 
@@ -9,7 +12,6 @@ function createAgentWindow() {
   const display = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = display.workAreaSize;
 
-  // NORMAL モードのデフォルトサイズ
   const winWidth = 260;
   const winHeight = 210;
   const margin = 16;
@@ -23,10 +25,11 @@ function createAgentWindow() {
     width: winWidth,
     height: winHeight,
     resizable: false,
-    frame: true,            // ← タイトルバーありに戻す
-    transparent: false,     // ← 透明も一旦オフ
-    backgroundColor: "#020617", // ← 濃い色で中身が分かりやすく
-    alwaysOnTop: true,      // ← 右下で常に最前面
+    frame: false,                 // ✅ タイトルバーを消す
+    transparent: true,            // ✅ ウィンドウの背景を透明にする
+    backgroundColor: "#00000000", // 念のため完全透明
+    alwaysOnTop: true,
+    hasShadow: false,             // OSの影はいらない（CSSでつける）
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -34,10 +37,9 @@ function createAgentWindow() {
     },
   });
 
+
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
     agentWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
-    // 必要なら DevTools
-    // agentWindow.webContents.openDevTools({ mode: "detach" });
   } else {
     agentWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
   }
@@ -47,10 +49,33 @@ function createAgentWindow() {
   });
 }
 
-
-
 app.whenReady().then(() => {
   createAgentWindow();
+
+  // ★ NORMAL / COMPACT に応じてサイズ変更
+  ipcMain.on("set-display-mode", (_event, mode: DisplayMode) => {
+    if (!agentWindow) return;
+
+    const display = screen.getPrimaryDisplay();
+    const { width: screenWidth, height: screenHeight } = display.workAreaSize;
+    const margin = 16;
+
+    let winWidth: number;
+    let winHeight: number;
+
+    if (mode === "normal") {
+      winWidth = 260;
+      winHeight = 210;
+    } else {
+      winWidth = 96;
+      winHeight = 96;
+    }
+
+    const x = Math.round(screenWidth - winWidth - margin);
+    const y = Math.round(screenHeight - winHeight - margin);
+
+    agentWindow.setBounds({ x, y, width: winWidth, height: winHeight });
+  });
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -60,7 +85,6 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
-  // macOS でも右下エージェント以外のウィンドウを閉じたら終了でOK
   if (process.platform !== "darwin") {
     app.quit();
   }

@@ -1,9 +1,9 @@
+export {};
+
 declare global {
   interface Window {
-    agentAPI: {
-      ping: () => string;
+    electronAPI?: {
+      setDisplayMode: (mode: "normal" | "compact") => void;
     };
   }
 }
-
-export {};

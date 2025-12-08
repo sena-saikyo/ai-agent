@@ -1,5 +1,8 @@
-import { contextBridge } from 'electron';
+// electron/preload.ts
+import { contextBridge, ipcRenderer } from "electron";
 
-contextBridge.exposeInMainWorld('agentAPI', {
-  ping: () => 'ready'
+contextBridge.exposeInMainWorld("electronAPI", {
+  setDisplayMode: (mode: "normal" | "compact") => {
+    ipcRenderer.send("set-display-mode", mode);
+  },
 });

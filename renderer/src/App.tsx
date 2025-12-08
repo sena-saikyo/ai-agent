@@ -9,7 +9,7 @@ const App: React.FC = () => {
   const handleModeChange = (next: DisplayMode) => {
     setMode(next);
 
-    // 後で Electron 側とつなぐ用（まだ実装してなくてもOK）
+    // 後で Electron 側とつなぐ用（今は undefined でもOK）
     if (window.electronAPI?.setDisplayMode) {
       window.electronAPI.setDisplayMode(next);
     }
