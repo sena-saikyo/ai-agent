@@ -1,67 +1,67 @@
-import { app, BrowserWindow, screen } from 'electron';
-import path from 'path';
+import { app, BrowserWindow, screen } from "electron";
+import path from "node:path";
 
-const WINDOW_SIZE = {
-  normal: { width: 260, height: 320 },
-  compact: { width: 96, height: 96 }
-};
+let agentWindow: BrowserWindow | null = null;
 
-const isMac = process.platform === 'darwin';
+const isDev = !!process.env.VITE_DEV_SERVER_URL;
 
-function getWindowPosition(size: { width: number; height: number }) {
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.workAreaSize;
+function createAgentWindow() {
+  const display = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = display.workAreaSize;
 
-  const x = Math.max(0, width - size.width - 12);
-  const y = Math.max(0, height - size.height - 12);
-  return { x, y };
-}
+  // NORMAL モードのデフォルトサイズ
+  const winWidth = 260;
+  const winHeight = 210;
+  const margin = 16;
 
-function createWindow() {
-  const mode: keyof typeof WINDOW_SIZE = 'normal';
-  const { width, height } = WINDOW_SIZE[mode];
-  const position = getWindowPosition({ width, height });
+  const x = Math.round(screenWidth - winWidth - margin);
+  const y = Math.round(screenHeight - winHeight - margin);
 
-  const win = new BrowserWindow({
-    width,
-    height,
-    x: position.x,
-    y: position.y,
-    transparent: true,
-    frame: false,
-    alwaysOnTop: true,
+  agentWindow = new BrowserWindow({
+    x,
+    y,
+    width: winWidth,
+    height: winHeight,
     resizable: false,
-    skipTaskbar: true,
-    show: true,
+    frame: true,            // ← タイトルバーありに戻す
+    transparent: false,     // ← 透明も一旦オフ
+    backgroundColor: "#020617", // ← 濃い色で中身が分かりやすく
+    alwaysOnTop: true,      // ← 右下で常に最前面
     webPreferences: {
-      preload: path.join(__dirname, 'preload.ts'),
+      preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
-      nodeIntegration: false
-    }
+      nodeIntegration: false,
+    },
   });
 
-  const devServerUrl = process.env.VITE_DEV_SERVER_URL;
-  if (devServerUrl) {
-    win.loadURL(devServerUrl);
-    win.webContents.openDevTools({ mode: 'detach' });
+  if (isDev && process.env.VITE_DEV_SERVER_URL) {
+    agentWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+    // 必要なら DevTools
+    // agentWindow.webContents.openDevTools({ mode: "detach" });
   } else {
-    const htmlPath = path.join(__dirname, '../dist/renderer/index.html');
-    win.loadFile(htmlPath);
+    agentWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
   }
+
+  agentWindow.on("closed", () => {
+    agentWindow = null;
+  });
 }
 
-app.whenReady().then(() => {
-  createWindow();
 
-  app.on('activate', () => {
+
+app.whenReady().then(() => {
+  createAgentWindow();
+
+  app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+      createAgentWindow();
     }
   });
 });
 
-app.on('window-all-closed', () => {
-  if (!isMac) {
+app.on("window-all-closed", () => {
+  // macOS でも右下エージェント以外のウィンドウを閉じたら終了でOK
+  if (process.platform !== "darwin") {
     app.quit();
   }
 });
